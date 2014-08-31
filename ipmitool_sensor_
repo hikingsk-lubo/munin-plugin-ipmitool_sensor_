@@ -6,13 +6,14 @@ ipmitool_sensor_ - Wildcard-plugin to monitor sensors by using OpenIPMI tool.
 
 =head1 CONFIGURATION
 
-The possible wildcard values are the following: fan, temp, volt. So you
+The possible wildcard values are the following: fan, temp, volt, watt. So you
 would create symlinks to this plugin called ipmitool_sensor_fan,
 ipmitool_sensor_temp, and ipmitool_sensor_volt.
 
   ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_fan
   ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_temp
   ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_volt
+  ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_watt
 
 Add the following to your /etc/munin/plugin-conf.d/munin-node:
 
@@ -29,6 +30,8 @@ If you want to use "ipmitool sdr", add the following:
       timeout 20
       env.ipmitool_options sdr
 
+Note: I find it useful to use 'sdr list full' since it is much faster
+
 Configurable variables
 
   ipmitool            - ipmitool command (default: ipmitool)
@@ -40,7 +43,8 @@ Configurable variables
 
   fan_type_regex      - Regular expression for unit of fan (default: RPM)
   temp_type_regex     - Regular expression for unit of temp (default: degrees C)
-  volt_type_regex     - Regular expression for unit of volt (default: (Volts|Watts|Amps))
+  volt_type_regex     - Regular expression for unit of volt (default: Volts)
+  watt_type_regex     - Regular expression for unit of volt (default: Watts)
 
   fan_warn_percent    - Percentage over mininum for warning (default: 5)
   fan_lower_critical  - Preferred lower critical value for fan
@@ -51,6 +55,8 @@ Configurable variables
   temp_upper_critical - Preferred upper critical value for temp
   volt_warn_percent   - Percentage over mininum/under maximum for warning
                         Narrow the voltage bracket by this. (default: 20)
+  watt_warn_percent   - Percentage over mininum/under maximum for warning
+                        Narrow the wattage bracket by this. (default: 30)
 
 =head1 AUTHOR
 
@@ -94,10 +100,17 @@ my %config = (
     graph_args => '--base 1000 -l 0'
   },
   volt => {
-    regex => exists $ENV{'volt_type_regex'} ? qr/$ENV{'volt_type_regex'}/im : qr/(Volts|Watts|Amps)/im,
-    title => 'IPMITool Sensor: Voltages',
-    vtitle => '_AUTO_DETECT_FAILED_',
+    regex => exists $ENV{'volt_type_regex'} ? qr/$ENV{'volt_type_regex'}/im : qr/(Volts)/im,
+    title => 'IPMITool Sensor: Voltage',
+    vtitle => 'Volts',
     print_threshold => \&volt_threshold,
+    graph_args => '--base 1000'
+  },
+  watt => {
+    regex => exists $ENV{'watt_type_regex'} ? qr/$ENV{'watt_type_regex'}/im : qr/(Watts)/im,
+    title => 'IPMITool Sensor: Wattage',
+    vtitle => 'Watts',
+    print_threshold => \&watt_threshold,
     graph_args => '--base 1000'
   },
 );
@@ -132,18 +145,6 @@ my $text = get_sensor_data();
 my $sensor = 1;
 
 if (defined $ARGV[0] and $ARGV[0] eq 'config') {
-  # detect the unit of volt
-  if ($func eq 'volt') {
-    foreach my $line (@{$text}) {
-      if ($line =~ /$config{$func}->{regex}/) {
-        my ($label, $value, $unit, $lcr, $lnc, $unc, $ucr) = &get_sensor_items($line, $config{$func}->{regex});
-        $config{$func}->{vtitle} = $unit;
-        last;
-      }
-    }
-    $text = get_sensor_data();
-  }
-
   # print header
   print "graph_title $config{$func}->{title}\n";
   print "graph_vtitle $config{$func}->{vtitle}\n";
@@ -318,6 +319,21 @@ sub temp_threshold {
 sub volt_threshold {
   my ($name, $lcr, $lnc, $unc, $ucr) = @_;
   my $warn_percent = exists $ENV{volt_warn_percent} ? $ENV{volt_warn_percent} : 20;
+
+  if (! &is_valid_value($lcr)) { $lcr = ''; }
+  if (! &is_valid_value($lnc)) { $lnc = ($lcr eq '') ? '' : $lcr * (100 + $warn_percent) / 100; }
+  if (! &is_valid_value($ucr)) { $ucr = ''; }
+  if (! &is_valid_value($unc)) { $unc = ($ucr eq '') ? '' : $ucr * (100 - $warn_percent) / 100; }
+
+  return unless ($lcr ne '' || $lnc ne '' || $unc ne '' || $ucr ne '');
+
+  printf "$name.warning $lnc:$unc\n";
+  printf "$name.critical $lcr:$ucr\n";
+}
+
+sub watt_threshold {
+  my ($name, $lcr, $lnc, $unc, $ucr) = @_;
+  my $warn_percent = exists $ENV{watt_warn_percent} ? $ENV{watt_warn_percent} : 20;
 
   if (! &is_valid_value($lcr)) { $lcr = ''; }
   if (! &is_valid_value($lnc)) { $lnc = ($lcr eq '') ? '' : $lcr * (100 + $warn_percent) / 100; }
