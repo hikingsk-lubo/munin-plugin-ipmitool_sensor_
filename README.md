@@ -1,8 +1,8 @@
-=head1 CONFIGURATION
+# CONFIGURATION
 
 The possible wildcard values are the following: fan, temp, volt, watt. So you
-would create symlinks to this plugin called ipmitool_sensor_fan,
-ipmitool_sensor_temp, and ipmitool_sensor_volt.
+would create symlinks to this plugin called ipmitool\_sensor\_fan,
+ipmitool\_sensor\_temp, and ipmitool\_sensor\_volt.
 
     ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_fan
     ln -s /usr/share/munin/plugins/ipmitool_sensor_ /etc/munin/plugins/ipmitool_sensor_temp
@@ -34,12 +34,12 @@ Configurable variables
     cache_file          - cache file
                           (default: /var/lib/munin/plugin-state/plugin-ipmitool_sensor.cache)
     cache_expires       - cache expires (default: 275)
-  
+
     fan_type_regex      - Regular expression for unit of fan (default: RPM)
     temp_type_regex     - Regular expression for unit of temp (default: degrees C)
     volt_type_regex     - Regular expression for unit of volt (default: Volts)
     watt_type_regex     - Regular expression for unit of volt (default: Watts)
-  
+
     fan_warn_percent    - Percentage over mininum for warning (default: 5)
     fan_lower_critical  - Preferred lower critical value for fan
     fan_upper_critical  - Preferred upper critical value for fan
@@ -52,20 +52,20 @@ Configurable variables
     watt_warn_percent   - Percentage over mininum/under maximum for warning
                           Narrow the wattage bracket by this. (default: 30)
 
-=head1 AUTHOR
+# AUTHOR
 
 Copyright (C) 2008 - 2013 Jun Futagawa (jfut)
 
-=head1 LICENSE
+# LICENSE
 
 GPLv2
 
-=head1 MAGIC MARKERS
+# MAGIC MARKERS
 
-#%# family=manual
-##%# capabilities=autoconf suggest
+\#%\# family=manual
+\#\#%\# capabilities=autoconf suggest
 
-=head1 HOW TO TEST
+# HOW TO TEST
 
     cache_file=ipmitool_sensor_ cache_expires=-1 ./ipmitool_sensor_volt
     cache_file=ipmitool_sensor_ cache_expires=-1 ./ipmitool_sensor_volt config
@@ -78,7 +78,7 @@ GPLv2
     volt_warn_percent=50 \
       cache_file=ipmitool_sensor_ cache_expires=-1 ./ipmitool_sensor_volt config
 
-=head1 TEST DATA
+# TEST DATA
 
     unr  Upper Non-Recoverable
     ucr  Upper Critical
@@ -87,7 +87,7 @@ GPLv2
     lcr  Lower Critical
     lnr  Lower Non-Recoverable
 
-=head2 IPMITOOL SENSOR
+## IPMITOOL SENSOR
 
     # HP ProLiant ML110 G5
     CPU FAN          | 1434.309   | RPM        | ok    | 5537.099  | 4960.317  | 4859.086  | na        | 937.383   | na
@@ -119,7 +119,7 @@ GPLv2
     Power Meter      | 214.000    | Watts      | cr    | na        | na        | 384.000   | na        | na        | na
     Power Meter 2    | 220.000    | watts      | cr    | na        | na        | 384.000   | na        | na        | na
 
-=head2 IPMITOOL SDR
+## IPMITOOL SDR
 
     # HP ProLiant ML110 G5
     CPU FAN          | 1434.31 RPM       | ok
@@ -148,4 +148,3 @@ GPLv2
     Temp 7           | disabled          | ns
     Power Meter      | 208 Watts         | cr
     Power Meter 2    | 210 watts         | cr
-
