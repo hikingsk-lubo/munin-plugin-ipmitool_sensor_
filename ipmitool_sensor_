@@ -57,6 +57,10 @@ Configurable variables
                         Narrow the voltage bracket by this. (default: 20)
   watt_warn_percent   - Percentage over mininum/under maximum for warning
                         Narrow the wattage bracket by this. (default: 30)
+  watt_lower_critical - Preferred lower critical value for watt
+  watt_lower_warning  - Preferred lower warining value for watt
+  watt_upper_warning  - Preferred upper warning value for watt
+  watt_upper_critical - Preferred upper critical value for watt
 
 =head1 AUTHOR
 
@@ -88,7 +92,7 @@ my %config = (
   fan => {
     regex => exists $ENV{'fan_type_regex'} ? qr/$ENV{'fan_type_regex'}/im : qr/RPM/im,
     title => 'IPMITool Sensor: Fans',
-    vtitle => 'RPM',
+    vtitle => $ENV{'fan_type_regex'},
     print_threshold => \&fan_threshold,
     graph_args => '--base 1000 -l 0'
   },
@@ -155,7 +159,7 @@ if (defined $ARGV[0] and $ARGV[0] eq 'config') {
   foreach my $line (@{$text}) {
     if ($line =~ /$config{$func}->{regex}/) {
       my ($label, $value, $unit, $lcr, $lnc, $unc, $ucr) = &get_sensor_items($line, $config{$func}->{regex});
-      if (&is_valid_value($value)) {
+      if (&is_valid_value($value) && $label ne 'Fans') {
         print "$func$sensor.label $label\n";
         $config{$func}->{print_threshold}->($func.$sensor, $lcr, $lnc, $unc, $ucr);
         print "$func$sensor.graph no\n" if exists $ENV{"ignore_$func$sensor"};
@@ -171,7 +175,7 @@ foreach my $line (@{$text}) {
     my ($label, $value, $unit, $lcr, $lnc, $unc, $ucr) = &get_sensor_items($line, $config{$func}->{regex});
     # for debug
     # print "$func$sensor.value [$label] [$value] [$lcr] [$lnc] [$unc] [$ucr]\n";
-    if (&is_valid_value($value)) {
+    if (&is_valid_value($value) && $label ne 'Fans') {
       print "$func$sensor.value $value\n";
       $sensor++;
     }
@@ -217,7 +221,7 @@ sub get_sensor_items {
   my ($line, $regex) = @_;
   my @items = split(/\s*\|\s*/, $line);
   my ($label, $value, $unit, $lcr, $lnc, $unc, $ucr)
-    = (trim($items[0]), trim($items[1]), trim($items[2]), trim($items[5]), trim($items[6]), trim($items[7]), trim($items[8]));
+    = (trim($items[0]), trim($items[1]), trim($items[2]), trim($items[5]), trim($items[6]), trim($items[8]), trim($items[9]));
   if ($#items == 9) {
      # ipmitool sensor
   } elsif ($#items == 2) {
@@ -228,18 +232,77 @@ sub get_sensor_items {
      }
   }
 
-  # some boards show data in incorrect order.
-  # - HP ProLiant ML110 G5
-  # CPU FAN     | 1434.309 | RPM | ok | 5537.099 | 4960.317 | 4859.086 | na | 937.383 | na
-  # SYSTEM FAN  | 1506.932 | RPM | ok | 5952.381 | 5668.934 | 5411.255 | na | 937.383 | na
-  # - HP ProLiant DL160
-  # FAN1 ROTOR1 | 7680.492 | RPM | ok | na | inf | na | na | 1000.400 | na
+#   DL360G7 output sample
+
+#     VRM 1            | 0x0        | discrete   | 0x0280| na        | na        | na        | na        | na        | na        
+#     VRM 2            | 0x0        | discrete   | 0x0280| na        | na        | na        | na        | na        | na        
+#     UID Light        | 0x0        | discrete   | 0x0080| na        | na        | na        | na        | na        | na        
+#     Int. Health LED  | 0x0        | discrete   | 0x0080| na        | na        | na        | na        | na        | na        
+#     Ext. Health LED  | 0x0        | discrete   | 0x0080| na        | na        | na        | na        | na        | na        
+#     Power Supply 1   | 0          | Watts      | ok    | na        | na        | na        | na        | na        | na        
+#     Power Supply 2   | 95         | Watts      | ok    | na        | na        | na        | na        | na        | na        
+#     Power Supplies   | 0x0        | discrete   | 0x0880| na        | na        | na        | na        | na        | na        
+#     Fan Block 1      | 18.032     | percent    | ok    | na        | na        | na        | na        | na        | na        
+#     Fan Block 2      | 18.032     | percent    | ok    | na        | na        | na        | na        | na        | na        
+#     Fan Block 3      | 18.032     | percent    | ok    | na        | na        | na        | na        | na        | na        
+#     Fan Block 4      | 18.032     | percent    | ok    | na        | na        | na        | na        | na        | na        
+#     Fans             | 0          | percent    | ok    | na        | na        | na        | na        | na        | na        
+#     Temp 1           | 25.000     | degrees C  | ok    | na        | na        | na        | na        | 42.000    | 46.000    
+#     Temp 2           | 40.000     | degrees C  | ok    | na        | na        | na        | na        | 82.000    | 83.000    
+#     Temp 3           | 40.000     | degrees C  | ok    | na        | na        | na        | na        | 82.000    | 83.000    
+#     Temp 4           | 37.000     | degrees C  | ok    | na        | na        | na        | na        | 87.000    | 92.000    
+#     Temp 5           | 38.000     | degrees C  | ok    | na        | na        | na        | na        | 78.000    | 83.000    
+#     Temp 6           | 39.000     | degrees C  | ok    | na        | na        | na        | na        | 87.000    | 92.000    
+#     Temp 7           | 37.000     | degrees C  | ok    | na        | na        | na        | na        | 78.000    | 83.000    
+#     Temp 8           | 36.000     | degrees C  | ok    | na        | na        | na        | na        | 87.000    | 92.000    
+#     Temp 9           | 35.000     | degrees C  | ok    | na        | na        | na        | na        | 78.000    | 83.000    
+#     Temp 10          | 36.000     | degrees C  | ok    | na        | na        | na        | na        | 87.000    | 92.000    
+#     Temp 11          | 34.000     | degrees C  | ok    | na        | na        | na        | na        | 78.000    | 83.000    
+#     Temp 12          | 34.000     | degrees C  | ok    | na        | na        | na        | na        | 59.000    | 64.000    
+#     Temp 13          | 49.000     | degrees C  | ok    | na        | na        | na        | na        | 73.000    | 78.000    
+#     Temp 14          | 32.000     | degrees C  | ok    | na        | na        | na        | na        | 72.000    | 77.000    
+#     Temp 15          | 32.000     | degrees C  | ok    | na        | na        | na        | na        | 73.000    | 78.000    
+#     Temp 16          | 32.000     | degrees C  | ok    | na        | na        | na        | na        | 64.000    | 69.000    
+#     Temp 17          | 32.000     | degrees C  | ok    | na        | na        | na        | na        | 63.000    | 68.000    
+#     Temp 18          | 42.000     | degrees C  | ok    | na        | na        | na        | na        | 69.000    | 74.000    
+#     Temp 19          | 39.000     | degrees C  | ok    | na        | na        | na        | na        | 69.000    | 74.000    
+#     Temp 20          | 42.000     | degrees C  | ok    | na        | na        | na        | na        | 71.000    | 76.000    
+#     Temp 21          | 48.000     | degrees C  | ok    | na        | na        | na        | na        | 65.000    | 70.000    
+#     Temp 22          | 51.000     | degrees C  | ok    | na        | na        | na        | na        | 71.000    | 76.000    
+#     Temp 23          | 43.000     | degrees C  | ok    | na        | na        | na        | na        | 69.000    | 74.000    
+#     Temp 24          | 50.000     | degrees C  | ok    | na        | na        | na        | na        | 69.000    | 74.000    
+#     Temp 25          | 38.000     | degrees C  | ok    | na        | na        | na        | na        | 63.000    | 68.000    
+#     Temp 26          | 48.000     | degrees C  | ok    | na        | na        | na        | na        | 66.000    | 71.000    
+#     Temp 27          | na         |            | na    | na        | na        | na        | na        | 60.000    | 65.000    
+#     Temp 28          | 71.000     | degrees C  | ok    | na        | na        | na        | na        | 110.000   | 115.000   
+#     Power Meter      | 94         | Watts      | ok    | na        | na        | na        | na        | na        | na        
+#     Memory           | 0x0        | discrete   | 0x4180| na        | na        | na        | na        | na        | na        
+#     Cntlr 1 Bay 1    | 0x1        | discrete   | 0x0180| na        | na        | na        | na        | na        | na        
+#     Cntlr 1 Bay 2    | 0x1        | discrete   | 0x0180| na        | na        | na        | na        | na        | na        
+#     Cntlr 1 Bay 3    | 0x1        | discrete   | 0x0180| na        | na        | na        | na        | na        | na        
+#     Cntlr 1 Bay 4    | 0x1        | discrete   | 0x0180| na        | na        | na        | na        | na        | na 
+  
   if (&is_valid_value($lcr) && &is_valid_value($ucr) && $lcr > $ucr || $lcr eq 'inf') {
     ($lcr, $lnc, $unc, $ucr) = ($ucr, $unc, $lnc, $lcr);
   }
   if (&is_valid_value($lnc) && &is_valid_value($unc) && $lnc > $unc || $lnc eq 'inf') {
     ($lcr, $lnc, $unc, $ucr) = ($ucr, $unc, $lnc, $lcr);
   }
+  
+  # DL360G7 iLO3 specific replacements
+  if ($label eq 'Temp 1') { $label = 'Ambient'; }
+  if ($label eq 'Temp 2') { $label = 'CPU'; }
+  if ($label eq 'Temp 3') { $label = 'CPU'; }
+  if ($label eq 'Temp 4' || $label eq 'Temp 5' || $label eq 'Temp 6' || $label eq 'Temp 7' || $label eq 'Temp 8' || $label eq 'Temp 9' || $label eq 'Temp 10' || $label eq 'Temp 11') { $label = 'Memory'; }
+  if ($label eq 'Temp 12'|| $label eq 'Temp 13' ) { $label = 'Power supply'; }
+  if ($label eq 'Temp 14') { $label = 'Memory'; }
+  if ($label eq 'Temp 15'|| $label eq 'Temp 16') { $label = 'CPU'; }
+  if ($label eq 'Temp 17') { $label = 'Memory'; }
+  if ($label eq 'Temp 18') { $label = 'CPU'; }
+  if ($label eq 'Temp 19' || $label eq 'Temp 20' || $label eq 'Temp 21' || $label eq 'Temp 22' || $label eq 'Temp 23' || $label eq 'Temp 24' || $label eq 'Temp 25' || $label eq 'Temp 26') { $label = 'System'; }
+  if ($label eq 'Temp 27') { $label = 'Storage'; }
+  if ($label eq 'Temp 28') { $label = 'System'; }
+  
   return ($label, $value, $unit, $lcr, $lnc, $unc, $ucr);
 }
 
@@ -271,11 +334,16 @@ sub fan_threshold {
     if ($unc eq 'inf') { $unc = ''; }
     else { $unc = ($ucr eq '') ? '' : $ucr * (100 - $warn_percent) / 100; }
   }
-
+  
   return unless ($lcr ne '' || $lnc ne '' || $unc ne '' || $ucr ne '');
-
-  printf "$name.warning $lnc:$unc\n";
-  printf "$name.critical $lcr:$ucr\n";
+  
+  if ( $name eq 'fan5' ) {
+    # This sensor has always 0 reading, we skip 
+  } else {
+    printf "$name.warning $lnc:$unc\n";
+    printf "$name.critical $lcr:$ucr\n";    
+  }
+  
 }
 
 sub temp_threshold {
@@ -316,14 +384,37 @@ sub temp_threshold {
   printf "$name.critical $lcr:$ucr\n";
 }
 
-sub volt_threshold {
+sub watt_threshold {
   my ($name, $lcr, $lnc, $unc, $ucr) = @_;
-  my $warn_percent = exists $ENV{volt_warn_percent} ? $ENV{volt_warn_percent} : 20;
-
-  if (! &is_valid_value($lcr)) { $lcr = ''; }
-  if (! &is_valid_value($lnc)) { $lnc = ($lcr eq '') ? '' : $lcr * (100 + $warn_percent) / 100; }
-  if (! &is_valid_value($ucr)) { $ucr = ''; }
-  if (! &is_valid_value($unc)) { $unc = ($ucr eq '') ? '' : $ucr * (100 - $warn_percent) / 100; }
+  my $warn_percent = exists $ENV{watt_warn_percent} ? $ENV{watt_warn_percent} : 20;
+  
+  # lcr: lower critical
+  if (exists $ENV{watt_lower_critical}) {
+    $lcr = $ENV{watt_lower_critical};
+  } elsif (! &is_valid_value($lcr)) { 
+    $lcr = ''; 
+  }
+  
+  # lnc: lower warning
+  if (exists $ENV{watt_lower_warning}) {
+    $lnc = $ENV{watt_lower_warning};
+  } elsif (! &is_valid_value($lnc)) { 
+    $lnc = ($lcr eq '') ? '' : $lcr * (100 + $warn_percent) / 100; 
+  }
+  
+  # ucr: upper critical
+  if (exists $ENV{watt_upper_critical}) {
+    $ucr = $ENV{watt_upper_critical};
+  } elsif (! &is_valid_value($ucr)) { 
+    $ucr = ''; 
+  }
+  
+  # unc: upper warning
+  if (exists $ENV{watt_upper_warning}) {
+    $unc = $ENV{watt_upper_warning};
+  } elsif (! &is_valid_value($unc)) { 
+    $unc = ($ucr eq '') ? '' : $ucr * (100 - $warn_percent) / 100; 
+  }
 
   return unless ($lcr ne '' || $lnc ne '' || $unc ne '' || $ucr ne '');
 
@@ -331,9 +422,9 @@ sub volt_threshold {
   printf "$name.critical $lcr:$ucr\n";
 }
 
-sub watt_threshold {
+sub volt_threshold {
   my ($name, $lcr, $lnc, $unc, $ucr) = @_;
-  my $warn_percent = exists $ENV{watt_warn_percent} ? $ENV{watt_warn_percent} : 20;
+  my $warn_percent = exists $ENV{volt_warn_percent} ? $ENV{volt_warn_percent} : 20;
 
   if (! &is_valid_value($lcr)) { $lcr = ''; }
   if (! &is_valid_value($lnc)) { $lnc = ($lcr eq '') ? '' : $lcr * (100 + $warn_percent) / 100; }
